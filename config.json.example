@@ -1,0 +1,5 @@
+{
+    "cloudpath": "file://my_path_to_data/"
+    "mip": 3
+    "shape": (256, 256, 256)
+}
