@@ -71,7 +71,7 @@ class MeshConfig:
     cloudpath: str
     out_dir: str
     mip: int = 0
-    shape: Tuple[int, int, int] = (448, 448, 448)
+    shape: Tuple[int, int, int] = (256, 256, 256)
     simplification: bool = True
     max_simplification_error: float = 40
     mesh_dir: Optional[str] = None
@@ -85,6 +85,12 @@ class MeshConfig:
     sharded: bool = False
     manifest_magnitude: int = 3
     parallel: Union[bool, int] = True
+
+    # Multi-res options
+    nlod: int = 3  # number of extra LODs
+    vqb: int = 10  # vertex quantization bits
+    min_chunk_size: Tuple[int, int, int] = (256, 256, 256)
+    merge_dir: Optional[str] = None  # optional output directory for merged meshes
 
 
 def _parse_shape(value: Union[str, Sequence[int]]) -> Tuple[int, int, int]:
@@ -142,6 +148,10 @@ def load_config(path: str = "config.json") -> MeshConfig:
         sharded=bool(raw.get("sharded", False)),
         manifest_magnitude=int(raw.get("manifest_magnitude", 3)),
         parallel=raw.get("parallel", True),
+        nlod=int(raw.get("nlod", 0)),
+        vqb=int(raw.get("vqb", 16)),
+        min_chunk_size=_parse_shape(raw.get("min_chunk_size", (256, 256, 256))),
+        merge_dir=raw.get("merge_dir"),
     )
     return cfg
 
@@ -186,18 +196,34 @@ def queue_meshing_tasks(tq: LocalTaskQueue, cfg: MeshConfig) -> None:
     logging.info("Inserting %d meshing tasks", len(tasks))
     tq.insert(tasks)
 
-
-def queue_manifest_tasks(tq: LocalTaskQueue, cfg: MeshConfig) -> None:
+def queue_merge_tasks(tq: LocalTaskQueue, cfg: MeshConfig) -> None:
     """
-    Build and enqueue mesh manifest tasks (second pass).
+    Build and enqueue merge tasks.
 
-    Parameters
-    ----------
-    cfg.manifest_magnitude : int
-        Magnitude parameter controlling manifest granularity (typ. 3).
+    If cfg.nlod > 0, creates multiresolution meshes with extra LODs.
+    Otherwise, falls back to single-resolution manifest.
     """
-    tasks = tc.create_mesh_manifest_tasks(cfg.cloudpath, magnitude=cfg.manifest_magnitude)
-    logging.info("Inserting %d manifest tasks", len(tasks))
+    if cfg.nlod > 0:
+        tasks = tc.create_unsharded_multires_mesh_tasks(
+            cfg.cloudpath,
+            num_lod=cfg.nlod,
+            magnitude=cfg.manifest_magnitude,
+            mesh_dir=cfg.merge_dir,
+            vertex_quantization_bits=cfg.vqb,
+            min_chunk_size=cfg.min_chunk_size,
+        )
+        logging.info(
+            "Inserting %d multires merge tasks (nlod=%d, vqb=%d)",
+            len(tasks), cfg.nlod, cfg.vqb,
+        )
+    else:
+        tasks = tc.create_mesh_manifest_tasks(
+            cfg.cloudpath,
+            magnitude=cfg.manifest_magnitude,
+            mesh_dir=cfg.merge_dir,
+        )
+        logging.info("Inserting %d manifest tasks", len(tasks))
+
     tq.insert(tasks)
 
 
@@ -246,14 +272,15 @@ def run(cfg: MeshConfig) -> None:
     queue_meshing_tasks(tq, cfg)
     tq.execute()
     logging.info("Meshing pass complete.")
-
-    # Second pass: Manifest
-    queue_manifest_tasks(tq, cfg)
+   
+    # NEW: Merge step (single or multires)
+    queue_merge_tasks(tq, cfg)
     tq.execute()
-    logging.info("Manifest pass complete.")
-
+    logging.info("Merge pass complete.")
+    
     # Stage to Brainlife out_dir if local
-    move_local_outputs(cfg)
+    # Disabled for now until I figure out best practice
+    #move_local_outputs(cfg)
 
 
 # --------------------------------- Main ---------------------------------- #

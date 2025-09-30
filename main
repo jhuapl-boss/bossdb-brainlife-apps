@@ -12,7 +12,8 @@ SBATCH --time=00:15:00
 # Author: Daniel Xenes
 
 # make output directory
-mkdir -p out_dir
+OUTPUT_DIR="out"
+mkdir -p $OUTPUT_DIR
 
 # run the actual python code
 singularity exec docker://brainlife/bossdb-mesh python3 mesh.py

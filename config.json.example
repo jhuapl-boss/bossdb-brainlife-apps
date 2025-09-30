@@ -1,7 +1,7 @@
 {
-  "cloudpath": "file://data/",
+  "cloudpath": "file://data/segmentation",
   "out_dir": "out",
-  "mip": 2,
+  "mip": 0,
   "shape": "256 256 256",
   "simplification": true,
   "max_simplification_error": 40,
@@ -15,5 +15,9 @@
   "spatial_index": true,
   "sharded": false,
   "manifest_magnitude": 3,
-  "parallel": true
+  "parallel": true,
+  "nlod": 2,
+  "vqb": 16,
+  "min_chunk_size": "256 256 256",
+  "merge_dir": null
 }
