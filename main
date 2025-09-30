@@ -15,4 +15,4 @@ SBATCH --time=00:15:00
 mkdir -p out_dir
 
 # run the actual python code
-singularity exec docker://brainlife/bossdb-mesh python3 main.py
+singularity exec docker://brainlife/bossdb-mesh python3 mesh.py

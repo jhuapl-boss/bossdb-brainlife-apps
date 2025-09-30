@@ -1,5 +1,19 @@
 {
-    "cloudpath": "file://my_path_to_data/"
-    "mip": 3
-    "shape": (256, 256, 256)
+  "cloudpath": "file://data/",
+  "out_dir": "out",
+  "mip": 2,
+  "shape": "256 256 256",
+  "simplification": true,
+  "max_simplification_error": 40,
+  "mesh_dir": null,
+  "cdn_cache": false,
+  "dust_threshold": null,
+  "object_ids": null,
+  "progress": false,
+  "fill_missing": true,
+  "encoding": "precomputed",
+  "spatial_index": true,
+  "sharded": false,
+  "manifest_magnitude": 3,
+  "parallel": true
 }
