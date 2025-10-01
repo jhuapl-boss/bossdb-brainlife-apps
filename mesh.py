@@ -280,7 +280,7 @@ def run(cfg: MeshConfig) -> None:
     
     # Stage to Brainlife out_dir if local
     # Disabled for now until I figure out best practice
-    #move_local_outputs(cfg)
+    move_local_outputs(cfg)
 
 
 # --------------------------------- Main ---------------------------------- #

@@ -16,4 +16,4 @@ OUTPUT_DIR="out"
 mkdir -p $OUTPUT_DIR
 
 # run the actual python code
-singularity exec docker://brainlife/bossdb-mesh python3 mesh.py
+singularity exec docker://xenesd1/bossdb-brainlife:mesh python3 mesh.py
