@@ -131,7 +131,7 @@ def load_config(path: str = "config.json") -> MeshConfig:
         raw = json.load(f)
 
     cfg = MeshConfig(
-        cloudpath=raw["cloudpath"],
+        cloudpath="file://" + os.path.join(raw["layer"], "segmentation"),
         out_dir=raw.get("out_dir", "out"),
         mip=int(raw.get("mip", 0)),
         shape=_parse_shape(raw.get("shape", (448, 448, 448))),
