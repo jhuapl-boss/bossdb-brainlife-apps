@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
 
     # Mesh on 8 cores, use True to use all cores
-    cloudpath = config['cloudpath']
+    cloudpath = config['layer']
     tq = LocalTaskQueue(parallel=True)
 
     tasks = tc.create_meshing_tasks(cloudpath, mip=config['mip'], shape=tuple(config['shape']))
