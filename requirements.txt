@@ -1,1 +1,2 @@
-igneous-pipeline
+cloud-volume==12.14.4
+tifffile==2026.9.9

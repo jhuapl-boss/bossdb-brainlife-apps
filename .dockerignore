@@ -1,0 +1,11 @@
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+config.json
+data
+image.png
+outputs
+product.json
+tests

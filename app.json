@@ -1,0 +1,73 @@
+{
+  "name": "BossDB TIFF Export",
+  "desc": "Export a public BossDB precomputed cutout as a 3D TIFF or TIFF slices.",
+  "github": "jhuapl-boss/bossdb-brainlife-apps",
+  "github_branch": "apex-hackathon-2026",
+  "inputs": [
+    {
+      "id": "input",
+      "datatype": "6aa1c3da87d45c3b2da10ea6",
+      "desc": "Public BossDB channel reference"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "outputs",
+      "datatype": "59c3eae633fc1cf9ead71679",
+      "datatype_tags": ["tiff"],
+      "desc": "TIFF export and metadata"
+    }
+  ],
+  "config": {
+    "channel": {
+      "type": "input",
+      "input_id": "input",
+      "file_id": "channel"
+    },
+    "x_start": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "desc": "Inclusive starting X coordinate at the selected mip"
+    },
+    "y_start": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "desc": "Inclusive starting Y coordinate at the selected mip"
+    },
+    "z_start": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "desc": "Inclusive starting Z coordinate at the selected mip"
+    },
+    "x_stop": {
+      "type": "number",
+      "min": 0,
+      "desc": "Exclusive ending X coordinate at the selected mip"
+    },
+    "y_stop": {
+      "type": "number",
+      "min": 0,
+      "desc": "Exclusive ending Y coordinate at the selected mip"
+    },
+    "z_stop": {
+      "type": "number",
+      "min": 0,
+      "desc": "Exclusive ending Z coordinate at the selected mip"
+    },
+    "resolution": {
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "desc": "Precomputed mip level; 0 is base resolution"
+    },
+    "export_as_volume": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Write one 3D TIFF instead of individual Z slices"
+    }
+  },
+  "projects": []
+}

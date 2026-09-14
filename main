@@ -1,19 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-SBATCH --job-name=bossdb-mesh
-SBATCH --ntasks-per-node=8
-SBATCH --mem=64G
-SBATCH --time=00:15:00
+image="${BOSSDB_TIFF_IMAGE:-docker://ghcr.io/jhuapl-boss/bossdb-brainlife-apps:sha-$(git rev-parse HEAD)}"
 
-# Copyright (c) 2025 brainlife.io at University of Texas at Austin and Indiana University
-# 
-# This is the main file run by the brainlife.io orchestration system
-#
-# Author: Daniel Xenes
+if command -v apptainer >/dev/null 2>&1; then
+    runtime=apptainer
+else
+    runtime=singularity
+fi
 
-# make output directory
-OUTPUT_DIR="out"
-mkdir -p $OUTPUT_DIR
-
-# run the actual python code
-singularity exec docker://xenesd1/bossdb-brainlife:mesh python3 mesh.py
+exec "$runtime" exec --bind "$PWD:/work" --pwd /work "$image" \
+    python /opt/bossdb-tiff/export_tiff.py
