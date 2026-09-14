@@ -1,1 +1,7 @@
-igneous-pipeline
+pynwb==3.1.2
+h5py==3.14.0
+zarr==3.1.2
+fsspec==2025.9.0
+s3fs==2025.9.0
+aiohttp==3.12.15
+numpy==2.2.6

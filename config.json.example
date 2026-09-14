@@ -1,5 +1,6 @@
 {
-    "cloudpath": "file://my_path_to_data/"
-    "mip": 3
-    "shape": (256, 256, 256)
+  "kind": "nwb",
+  "input": "REPLACE_WITH_REFERENCE_URI",
+  "sample_elements": 64,
+  "anonymous": false
 }

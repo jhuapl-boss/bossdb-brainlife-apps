@@ -1,0 +1,52 @@
+{
+  "name": "NWB Reference Inspection",
+  "desc": "Inspect metadata and a small numeric sample from a reference dataset in place.",
+  "github": "tjgrafft/app-nwb-reference-inspect",
+  "github_branch": "main",
+  "inputs": [
+    {
+      "id": "data",
+      "datatype": "69f24b375e3b9b921dc25e49",
+      "desc": "Reference input"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "report",
+      "datatype": "5e56dc330f7fa604cc3cc291",
+      "desc": "Inspection report with downloadable JSON"
+    }
+  ],
+  "config": {
+    "input": {
+      "type": "input",
+      "input_id": "data",
+      "file_id": "nwb"
+    },
+    "kind": {
+      "type": "string",
+      "default": "nwb",
+      "readonly": true
+    },
+    "sample_elements": {
+      "type": "number",
+      "default": 64,
+      "min": 1,
+      "max": 4096
+    },
+    "array_path": {
+      "type": "string",
+      "default": "",
+      "optional": true,
+      "desc": "Optional HDF5 dataset path or OME array path"
+    },
+    "anonymous": {
+      "type": "boolean",
+      "default": false,
+      "desc": "Enable only for public S3 stores; otherwise use resource credentials"
+    }
+  },
+  "projects": [
+    "6aa2c76299cc9a38add4d221"
+  ]
+}

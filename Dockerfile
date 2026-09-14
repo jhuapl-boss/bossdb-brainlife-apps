@@ -1,7 +1,6 @@
-FROM python:3.12
-COPY requirements.txt /app/requirements.txt
-RUN pip install -r /app/requirements.txt
-WORKDIR /app
-COPY main.py /app/
-#RUN chmod +x /app/run.py
-#CMD ["./run.sh"]
+FROM python:3.11-slim
+COPY requirements.lock.txt /opt/reference-inspect/requirements.lock.txt
+RUN pip install --no-cache-dir -r /opt/reference-inspect/requirements.lock.txt
+COPY inspect_reference.py /opt/reference-inspect/inspect_reference.py
+WORKDIR /work
+ENTRYPOINT ["python", "/opt/reference-inspect/inspect_reference.py"]
