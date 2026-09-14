@@ -54,11 +54,17 @@ class BossDBChannel:
 
 def _required_integer(config: Mapping[str, Any], name: str) -> int:
     value = config.get(name)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, str):
+        value = value.strip()
+        if not re.fullmatch(r"[0-9]+", value):
+            raise ValueError(f"{name} must be an integer")
+        integer = int(value)
+    elif isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be an integer")
-    integer = int(value)
-    if value != integer:
-        raise ValueError(f"{name} must be an integer")
+    else:
+        integer = int(value)
+        if value != integer:
+            raise ValueError(f"{name} must be an integer")
     if integer < 0:
         raise ValueError(f"{name} must be non-negative")
     return integer
@@ -350,8 +356,7 @@ def main() -> int:
         run(load_config())
     except Exception as error:
         print(
-            f"BossDB TIFF export failed ({type(error).__name__}). "
-            "Check the public channel URI, selected-mip bounds, and resolution.",
+            f"BossDB TIFF export failed ({type(error).__name__}): {error}",
             file=sys.stderr,
         )
         return 1

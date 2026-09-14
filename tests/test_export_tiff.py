@@ -58,6 +58,34 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.x_stop, 4)
         self.assertEqual(config.shape_xyz, (3, 2, 2))
 
+    def test_accepts_brainlife_string_coordinates_and_internal_fields(self):
+        config = export_tiff.validate_config({
+            "channel": "bossdb://chandok2026/human_boutons/8_nm_volume_upsampled",
+            "x_start": "28672",
+            "y_start": "28672",
+            "z_start": "30",
+            "x_stop": "29672",
+            "y_stop": "29672",
+            "z_stop": "40",
+            "resolution": 0,
+            "export_as_volume": False,
+            "_inputs": [{"id": "input"}],
+            "_outputs": [{"id": "outputs", "subdir": "outputs"}],
+            "_app": "6aa8266284691735460ab5f9",
+            "_tid": 2,
+        })
+
+        self.assertEqual(config.starts, (28672, 28672, 30))
+        self.assertEqual(config.stops, (29672, 29672, 40))
+        self.assertEqual(config.shape_xyz, (1000, 1000, 10))
+
+    def test_rejects_non_integral_string_coordinates(self):
+        for value in ("", "1.5", "1e3", "-1", "not-a-number"):
+            with self.subTest(value=value), self.assertRaisesRegex(
+                ValueError, "x_start must be an integer"
+            ):
+                make_config(x_start=value)
+
     def test_rejects_missing_or_reversed_bounds(self):
         with self.assertRaisesRegex(ValueError, "x_stop must be an integer"):
             make_config(x_stop=None)

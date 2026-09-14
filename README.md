@@ -28,6 +28,8 @@ Brainlife generates `config.json`; `config.json.example` is a small public examp
 
 Coordinates are voxel indices in the selected mip level, not physical units or mip-0 coordinates. Every range must fit inside that mip's precomputed bounds.
 
+Brainlife may serialize values entered in number fields as JSON strings (for example, `"28672"`). The exporter accepts non-negative integer strings as well as JSON integer values.
+
 CloudVolume returns data in XYZ order. The exporter transposes it to conventional TIFF ZYX order. Slice mode downloads small Z batches aligned to the precomputed chunk depth, then writes one file per plane; this avoids repeatedly downloading the same source chunk while keeping memory bounded. Volume mode downloads the complete requested cutout into memory before writing it. Neither mode compresses the TIFF pixel data.
 
 An `outputs/export.json` sidecar records the source, selected mip, voxel size in nanometers, bounds, shape, dtype, and output mode. The app also writes Brainlife's root-level `product.json` success message.
