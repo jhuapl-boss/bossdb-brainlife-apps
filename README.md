@@ -6,6 +6,6 @@ Input a segmentation layer where objects touch each other. Output is a SQLite db
 
 ## Local use
 
-Copy `config.json.example` to `config.json` and set `segmentation_uri` to a CloudVolume-compatible segmentation URI. The other fields configure the graph label, output location, resolution, block size, optional Z bounds, and optional smoke-test task limit. The output directory must be new.
+Copy `config.json.example` to `config.json. The runner resolves this to the channel's backing precomputed CloudVolume URI. The other fields configure the graph label, output location, resolution, block size, optional Z bounds, and optional smoke-test task limit. The output directory must be new.
 
 Run `./run_local_contactome.sh` (or pass a config file path as its only argument). Store credentials such as `AWS_PROFILE` in the environment, not in `config.json`.

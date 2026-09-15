@@ -1,5 +1,4 @@
 {
-  "segmentation_uri": "REPLACE_WITH_PRECOMPUTED_SEGMENTATION_URI",
   "output_directory": "outputs",
   "graph_id": "contactome-example",
   "mip": "72,72,84",

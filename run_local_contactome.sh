@@ -13,11 +13,13 @@
 #
 # Example (small public Pinky100 trial):
 #   cp config.json.example config.json
-#   # Set segmentation_uri, mip, and enqueue_limit in config.json, then:
+#   # Set input, mip, and enqueue_limit in config.json, then:
 #   AWS_PROFILE=bossdb ./run_local_contactome.sh
 #
 # config.json fields:
-#   segmentation_uri  Required CloudVolume URI for the segmentation.
+#   input             Required public BossDB URI in the form
+#                     bossdb://collection/experiment/channel. It is resolved to
+#                     the backing precomputed CloudVolume URI before processing.
 #   output_directory  Output directory; default: contactome-output/<graph_id>.
 #   graph_id          Run label; default is a UTC timestamp.
 #   mip               MIP index or xyz resolution; default: 72,72,84.
@@ -56,7 +58,7 @@ mapfile -t config_values < <(
   python3 "$root/read_contactome_config.py" "$config_path" "$default_graph_id"
 )
 [[ ${#config_values[@]} -eq 8 ]] || die "could not read configuration from $config_path"
-segmentation_uri=${config_values[0]}
+segmentation_channel=${config_values[0]}
 graph_id=${config_values[1]}
 out_dir=${config_values[2]}
 mip=${config_values[3]}
@@ -83,7 +85,7 @@ queue_url="fq://$queue_dir"
 generate=(uv run --frozen python local_manage.py
   --sqlite-db-path "$raw_db" --mip "$mip" --queue-url "$queue_url"
   contactome generate --graph-id "$graph_id"
-  --segmentation-channel "$segmentation_uri"
+  --segmentation-channel "$segmentation_channel"
   --block-size-x "$block_x" --block-size-y "$block_y" --block-size-z "$block_z")
 [[ -z $z_start ]] || generate+=(--z-start "$z_start")
 [[ -z $z_end ]] || generate+=(--z-end "$z_end")

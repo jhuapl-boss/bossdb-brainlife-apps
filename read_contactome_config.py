@@ -3,6 +3,24 @@
 
 import json
 import sys
+from dataclasses import dataclass
+from pathlib import PurePosixPath
+import re
+import urllib.error
+import urllib.request
+from urllib.parse import quote, unquote, urlsplit
+
+DEFAULT_BOSSDB_API = "https://api.bossdb.io/v1"
+_S3_BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+
+
+@dataclass(frozen=True)
+class BossDBChannel:
+    uri: str
+    collection: str
+    experiment: str
+    channel: str
+    cloudpath: str
 
 
 def fail(message):
@@ -15,7 +33,7 @@ def string(config, name, default=None, required=False):
         return value
     if not isinstance(value, str) or not value.strip() or "\n" in value or "\r" in value:
         fail(f"{name} must be a non-empty single-line string")
-    return value
+    return value.strip()
 
 
 def positive_triplet(value, name):
@@ -33,7 +51,10 @@ def read_config(config_path, default_graph_id):
     if not isinstance(config, dict):
         fail("configuration must be a JSON object")
 
-    segmentation_uri = string(config, "segmentation_uri", required=True)
+    if "segmentation_uri" in config:
+        fail("segmentation_uri is no longer supported; use input instead")
+    input_uri = string(config, "input", required=True)
+    segmentation_channel = resolve_channel(input_uri).cloudpath
     graph_id = string(config, "graph_id", default_graph_id)
     output_directory = string(config, "output_directory", f"contactome-output/{graph_id}")
     mip = config.get("mip", "72,72,84")
@@ -54,7 +75,7 @@ def read_config(config_path, default_graph_id):
         fail("z_start must not be greater than z_end")
 
     return (
-        segmentation_uri,
+        segmentation_channel,
         graph_id,
         output_directory,
         mip,
@@ -64,6 +85,88 @@ def read_config(config_path, default_graph_id):
         enqueue_limit,
     )
 
+def fetch_json(url: str, timeout: int = 30):
+    request = urllib.request.Request(
+        url,
+        headers={"Accept": "application/json", "User-Agent": "brainlife-nuclei/1"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise ValueError("BossDB channel was not found or is not public") from error
+        raise RuntimeError(
+            f"BossDB metadata request failed with HTTP {error.code}"
+        ) from error
+    except urllib.error.URLError as error:
+        raise RuntimeError("BossDB metadata service could not be reached") from error
+
+
+def _precomputed_cloudpath(metadata) -> str:
+    if metadata.get("storage_type") != "cloudvol":
+        raise ValueError("BossDB channel is not stored as a precomputed CloudVolume")
+    bucket = metadata.get("bucket")
+    cv_path = metadata.get("cv_path")
+    if not isinstance(bucket, str) or not _S3_BUCKET.fullmatch(bucket):
+        raise ValueError("BossDB metadata did not provide a valid S3 bucket")
+    if not isinstance(cv_path, str) or not cv_path.strip("/"):
+        raise ValueError("BossDB metadata did not provide a precomputed path")
+    cv_path = cv_path.strip("/")
+    if any(part in ("", ".", "..") for part in PurePosixPath(cv_path).parts):
+        raise ValueError("BossDB metadata provided an invalid precomputed path")
+    if "://" in cv_path:
+        raise ValueError("BossDB metadata provided an invalid precomputed path")
+    return f"s3://{bucket}/{cv_path}"
+
+
+def parse_bossdb_uri(uri: str) -> tuple[str, str, str]:
+    parsed = urlsplit(uri)
+    parts = [unquote(part) for part in parsed.path.strip("/").split("/") if part]
+    collection = unquote(parsed.netloc)
+    if (
+        parsed.scheme.lower() != "bossdb"
+        or not collection
+        or len(parts) != 2
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(
+            "input must have the form bossdb://collection/experiment/channel"
+        )
+    if any(
+        "/" in value or "\\" in value or value in (".", "..")
+        for value in (collection, *parts)
+    ):
+        raise ValueError("BossDB identifiers may not contain path separators")
+    return collection, parts[0], parts[1]
+
+
+def resolve_channel(
+    uri: str,
+    *,
+    api_root = DEFAULT_BOSSDB_API,
+    json_fetcher = None,
+):
+    """Resolve a public BossDB channel URI to its precomputed CloudVolume path."""
+    collection, experiment, channel = parse_bossdb_uri(uri)
+    resource_url = (
+        f"{api_root.rstrip('/')}/collection/{quote(collection, safe='')}"
+        f"/experiment/{quote(experiment, safe='')}/channel/{quote(channel, safe='')}"
+    )
+    metadata = (json_fetcher or fetch_json)(resource_url)
+    if not isinstance(metadata, dict):
+        raise ValueError("BossDB metadata response was not a JSON object")
+    if metadata.get("public") is not True:
+        raise ValueError("BossDB channel is not public")
+    return BossDBChannel(
+        uri=uri,
+        collection=collection,
+        experiment=experiment,
+        channel=channel,
+        cloudpath=_precomputed_cloudpath(metadata),
+    )
+
 
 def main():
     if len(sys.argv) != 3:
@@ -71,7 +174,7 @@ def main():
         return 2
     try:
         values = read_config(sys.argv[1], sys.argv[2])
-    except (OSError, json.JSONDecodeError, ValueError) as error:
+    except (OSError, json.JSONDecodeError, RuntimeError, ValueError) as error:
         print(f"error: invalid configuration: {error}", file=sys.stderr)
         return 1
 
