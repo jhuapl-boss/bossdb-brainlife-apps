@@ -17,7 +17,7 @@ RUN apt-get update \
 COPY requirements.lock.txt /opt/bossdb-nuclei/requirements.lock.txt
 COPY pytorch_connectomics /opt/bossdb-nuclei/pytorch_connectomics
 RUN pip install -r /opt/bossdb-nuclei/requirements.lock.txt
-COPY nuclei_inference.py /opt/bossdb-nuclei/nuclei_inference.py
+COPY download_model.py nuclei_inference.py /opt/bossdb-nuclei/
 
 FROM runtime AS final
 COPY --from=model-assets /opt/bossdb-nuclei/models /opt/bossdb-nuclei/models
