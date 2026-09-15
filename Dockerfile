@@ -22,7 +22,8 @@ RUN uv sync --directory cloudome --frozen --no-dev
 ENV HOME=/tmp \
     UV_CACHE_DIR=/tmp/uv-cache
 
-COPY --chmod=755 run_local_contactome.sh read_contactome_config.py ./
+COPY --chmod=755 run_local_contactome.sh ./
+COPY --chmod=755 read_contactome_config.py ./
 RUN ./run_local_contactome.sh --help >/dev/null
 
 WORKDIR /work

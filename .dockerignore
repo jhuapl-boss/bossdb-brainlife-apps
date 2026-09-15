@@ -1,3 +1,4 @@
 *
 !Dockerfile
 !run_local_contactome.sh
+!read_contactome_config.py
