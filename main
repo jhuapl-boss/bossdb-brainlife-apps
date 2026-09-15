@@ -9,4 +9,4 @@ else
 fi
 # Preserve the resource credential chain; never serialize credentials into config.json.
 exec "$runtime" exec --bind "$PWD:/work" --pwd /work "$image" \
-    ./run_local_contactome.sh
+    /opt/contactome/run_local_contactome.sh
