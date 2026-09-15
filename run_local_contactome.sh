@@ -9,20 +9,25 @@
 # example AWS_PROFILE) stay in the process environment and are not copied.
 #
 # Usage:
-#   ./run_local_contactome.sh SEGMENTATION_URI [OUTPUT_DIRECTORY]
+#   ./run_local_contactome.sh [CONFIG_PATH]
 #
 # Example (small public Pinky100 trial):
-#   AWS_PROFILE=bossdb ENQUEUE_LIMIT=1000 MIP=64,64,40 \
-#     ./run_local_contactome.sh \
-#     precomputed://s3://bossdb-open-data/iarpa_microns/pinky/seg pinky-trial
+#   cp config.json.example config.json
+#   # Set segmentation_uri, mip, and enqueue_limit in config.json, then:
+#   AWS_PROFILE=bossdb ./run_local_contactome.sh
 #
-# Optional environment variables:
-#   GRAPH_ID       Run label; default is a UTC timestamp.
-#   MIP            MIP index or xyz resolution; default: 72,72,84.
-#   BLOCK_SIZE     Worker cuboid size x,y,z; default: 64,64,32. Each dimension
-#                  should be a multiple of the source's chunk size.
-#   Z_START/Z_END  Relative Z-voxel bounds; unset means the full Z extent.
-#   ENQUEUE_LIMIT  Maximum cuboids to run; use a small value for a smoke test.
+# config.json fields:
+#   segmentation_uri  Required CloudVolume URI for the segmentation.
+#   output_directory  Output directory; default: contactome-output/<graph_id>.
+#   graph_id          Run label; default is a UTC timestamp.
+#   mip               MIP index or xyz resolution; default: 72,72,84.
+#   block_size        Worker cuboid size x,y,z; default: 64,64,32. Each dimension
+#                     should be a multiple of the source's chunk size.
+#   z_start / z_end   Optional relative Z-voxel bounds; null means full Z extent.
+#   enqueue_limit     Optional maximum cuboids; useful for a smoke test.
+#
+# Credentials (for example AWS_PROFILE) remain environment variables and must
+# not be written to config.json.
 #
 # Progress and errors are written to contactome.log in the output directory as
 # well as displayed in the terminal.
@@ -35,22 +40,30 @@ usage() { sed -n '2,/^set -Eeuo pipefail/p' "$0" | sed '$d;s/^# \{0,1\}//'; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 [[ ${1:-} != -h && ${1:-} != --help ]] || { usage; exit; }
-[[ $# -ge 1 && $# -le 2 ]] || { usage >&2; exit 2; }
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
 command -v uv >/dev/null || die "uv is required (https://docs.astral.sh/uv/)"
+command -v python3 >/dev/null || die "python3 is required to read config.json"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cloudome="$root/cloudome"
 [[ -f "$cloudome/uv.lock" && -f "$cloudome/local_manage.py" ]] || \
   die "expected the Cloudome checkout at $cloudome"
 
-segmentation_uri=$1
-graph_id=${GRAPH_ID:-contactome-$(date -u +%Y%m%dT%H%M%SZ)}
-out_dir=${2:-"contactome-output/$graph_id"}
-mip=${MIP:-72,72,84}
-IFS=, read -r block_x block_y block_z extra <<<"${BLOCK_SIZE:-64,64,32}"
-[[ $block_x =~ ^[1-9][0-9]*$ && $block_y =~ ^[1-9][0-9]*$ && \
-   $block_z =~ ^[1-9][0-9]*$ && -z ${extra:-} ]] || \
-  die "BLOCK_SIZE must contain three positive integers (x,y,z)"
+config_path=${1:-config.json}
+[[ -f $config_path ]] || die "configuration file not found: $config_path"
+default_graph_id="contactome-$(date -u +%Y%m%dT%H%M%SZ)"
+mapfile -t config_values < <(
+  python3 "$root/read_contactome_config.py" "$config_path" "$default_graph_id"
+)
+[[ ${#config_values[@]} -eq 8 ]] || die "could not read configuration from $config_path"
+segmentation_uri=${config_values[0]}
+graph_id=${config_values[1]}
+out_dir=${config_values[2]}
+mip=${config_values[3]}
+IFS=, read -r block_x block_y block_z <<<"${config_values[4]}"
+z_start=${config_values[5]}
+z_end=${config_values[6]}
+enqueue_limit=${config_values[7]}
 
 mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd -P)"
@@ -72,9 +85,9 @@ generate=(uv run --frozen python local_manage.py
   contactome generate --graph-id "$graph_id"
   --segmentation-channel "$segmentation_uri"
   --block-size-x "$block_x" --block-size-y "$block_y" --block-size-z "$block_z")
-[[ -z ${Z_START:-} ]] || generate+=(--z-start "$Z_START")
-[[ -z ${Z_END:-} ]] || generate+=(--z-end "$Z_END")
-[[ -z ${ENQUEUE_LIMIT:-} ]] || generate+=(--enqueue-limit "$ENQUEUE_LIMIT")
+[[ -z $z_start ]] || generate+=(--z-start "$z_start")
+[[ -z $z_end ]] || generate+=(--z-end "$z_end")
+[[ -z $enqueue_limit ]] || generate+=(--enqueue-limit "$enqueue_limit")
 
 cd "$cloudome"
 printf 'Enqueueing graph %s...\n' "$graph_id"

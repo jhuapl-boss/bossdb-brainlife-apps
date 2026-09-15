@@ -1,9 +1,9 @@
 # Builds Cloudome and makes the single-script local runner the container command.
 # Example:
 #   docker build -t local-contactome .
-#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/results:/work/results" \
-#     -e MIP=64,64,40 -e ENQUEUE_LIMIT=10 local-contactome \
-#     precomputed://s3://bossdb-open-data/iarpa_microns/pinky/seg /work/results
+#   cp config.json.example config.json
+#   # Edit config.json, then mount its directory at /work:
+#   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" local-contactome
 # Override at build time to test another Cloudome revision without editing this file.
 ARG CLOUDOME_REPOSITORY=https://github.com/aplbrain/cloudome.git
 ARG CLOUDOME_REF=6854220de261ce6ddf945068d7a1a2af7eb2e635
@@ -22,7 +22,7 @@ RUN uv sync --directory cloudome --frozen --no-dev
 ENV HOME=/tmp \
     UV_CACHE_DIR=/tmp/uv-cache
 
-COPY --chmod=755 run_local_contactome.sh ./
+COPY --chmod=755 run_local_contactome.sh read_contactome_config.py ./
 RUN ./run_local_contactome.sh --help >/dev/null
 
 WORKDIR /work

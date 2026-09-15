@@ -1,0 +1,10 @@
+{
+  "segmentation_uri": "REPLACE_WITH_PRECOMPUTED_SEGMENTATION_URI",
+  "output_directory": "outputs",
+  "graph_id": "contactome-example",
+  "mip": "72,72,84",
+  "block_size": "64,64,32",
+  "z_start": null,
+  "z_end": null,
+  "enqueue_limit": 100
+}
