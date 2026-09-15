@@ -17,13 +17,26 @@ class FakeBounds:
 
 
 class FakeVolume:
-    def __init__(self, data, minimum=(0, 0, 0)):
+    def __init__(
+        self,
+        data,
+        minimum=(0, 0, 0),
+        resolution=(64, 64, 40),
+        scales=None,
+    ):
         self.data = np.asarray(data)
         self.dtype = self.data.dtype
-        self.resolution = (32, 32, 40)
+        self.resolution = resolution
         maximum = tuple(start + size for start, size in zip(minimum, self.data.shape))
         self.bounds = FakeBounds(minimum, maximum)
         self.minimum = minimum
+        self.scales = scales or [
+            {
+                "resolution": list(resolution),
+                "voxel_offset": list(minimum),
+                "size": list(self.data.shape),
+            }
+        ]
 
     def __getitem__(self, selection):
         local = tuple(
@@ -31,6 +44,42 @@ class FakeVolume:
             for part, offset in zip(selection, self.minimum)
         )
         return self.data[local][..., np.newaxis]
+
+
+class MetadataVolume:
+    def __init__(self, minimum, maximum, resolution, scales):
+        self.bounds = FakeBounds(minimum, maximum)
+        self.resolution = resolution
+        self.scales = scales
+
+
+MINNIE_SCALES = [
+    {
+        "resolution": [8, 8, 40],
+        "voxel_offset": [13824, 13824, 14816],
+        "size": [212992, 180224, 13088],
+    },
+    {
+        "resolution": [16, 16, 40],
+        "voxel_offset": [6912, 6912, 14816],
+        "size": [106496, 90112, 13088],
+    },
+    {
+        "resolution": [32, 32, 40],
+        "voxel_offset": [3456, 3456, 14816],
+        "size": [53248, 45056, 13088],
+    },
+    {
+        "resolution": [64, 64, 40],
+        "voxel_offset": [1728, 1728, 14816],
+        "size": [26624, 22528, 13088],
+    },
+    {
+        "resolution": [128, 128, 80],
+        "voxel_offset": [864, 864, 7408],
+        "size": [13312, 11264, 6544],
+    },
+]
 
 
 def make_config(**overrides):
@@ -101,6 +150,85 @@ class ConfigTests(unittest.TestCase):
 
 
 class DataTests(unittest.TestCase):
+    def test_corrects_submitted_minnie_config_to_training_resolution_mip(self):
+        config = inference.validate_config(
+            {
+                "channel": "bossdb://microns/minnie65_8x8x40/em",
+                "x_start": "14520",
+                "y_start": "11724",
+                "z_start": "21641",
+                "x_stop": "15032",
+                "y_stop": "12236",
+                "z_stop": "21705",
+                "resolution": "4",
+                "model": inference.MODEL_NAME,
+                "threshold": 0.5,
+                "_inputs": [{"id": "input"}],
+                "_outputs": [{"id": "outputs"}],
+            }
+        )
+        mip3 = MetadataVolume(
+            (1728, 1728, 14816),
+            (28352, 24256, 27904),
+            (64, 64, 40),
+            MINNIE_SCALES,
+        )
+        mip4 = MetadataVolume(
+            (864, 864, 7408),
+            (14176, 12128, 13952),
+            (128, 128, 80),
+            MINNIE_SCALES,
+        )
+        opened = []
+
+        def factory(cloudpath, mip):
+            opened.append((cloudpath, mip))
+            return {3: mip3, 4: mip4}[mip]
+
+        volume, mip, minimum, maximum, resolution = inference.select_source_volume(
+            "s3://bucket/minnie/em", config, factory
+        )
+
+        self.assertIs(volume, mip3)
+        self.assertEqual(mip, 3)
+        self.assertEqual(resolution, (64.0, 64.0, 40.0))
+        self.assertEqual(minimum, (1728, 1728, 14816))
+        self.assertEqual(maximum, (28352, 24256, 27904))
+        self.assertEqual(config.shape_xyz, (512, 512, 64))
+        self.assertEqual([mip for _, mip in opened], [4, 3])
+
+    def test_preserves_valid_human_boutons_mip(self):
+        config = make_config(
+            channel="bossdb://chandok2026/human_boutons/8_nm_volume_upsampled",
+            x_start="28672",
+            y_start="28672",
+            z_start="30",
+            x_stop="29672",
+            y_stop="29672",
+            z_stop="40",
+            resolution=0,
+        )
+        volume = MetadataVolume(
+            (0, 0, 0),
+            (57344, 57344, 60),
+            (4, 4, 30),
+            [],
+        )
+        opened = []
+
+        def factory(cloudpath, mip):
+            opened.append(mip)
+            return volume
+
+        selected, mip, _minimum, _maximum, resolution = inference.select_source_volume(
+            "s3://bucket/human/em", config, factory
+        )
+
+        self.assertIs(selected, volume)
+        self.assertEqual(mip, 0)
+        self.assertEqual(resolution, (4.0, 4.0, 30.0))
+        self.assertEqual(opened, [0])
+
     def test_download_transposes_xyz_to_zyx(self):
         data = np.arange(5 * 4 * 4, dtype=np.uint8).reshape(5, 4, 4)
         actual = inference.download_cutout_zyx(FakeVolume(data), make_config())
@@ -257,6 +385,9 @@ class OutputTests(unittest.TestCase):
             else:
                 os.environ["NUCLEI_MODEL_ROOT"] = old_model_root
         self.assertEqual(sidecar, report)
+        self.assertEqual(report["requested_source_mip"], 0)
+        self.assertEqual(report["source_mip"], 0)
+        self.assertFalse(report["source_mip_was_corrected"])
         self.assertEqual(report["output"]["foreground_voxels"], 12)
         self.assertEqual(product["brainlife"][0]["type"], "success")
 

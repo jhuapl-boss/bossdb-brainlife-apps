@@ -13,7 +13,7 @@
   "outputs": [
     {
       "id": "outputs",
-      "datatype": "59c3eae633fc1cf9ead71679",
+      "datatype": "68dc181cf9e4ee316ef6eea9",
       "datatype_tags": ["precomputed", "segmentation"],
       "desc": "Binary nuclei segmentation in Neuroglancer precomputed format"
     }

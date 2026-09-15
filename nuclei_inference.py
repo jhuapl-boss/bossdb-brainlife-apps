@@ -12,10 +12,11 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any
 from urllib.parse import quote, unquote, urlsplit
 
 DEFAULT_BOSSDB_API = "https://api.bossdb.io/v1"
@@ -31,7 +32,7 @@ PYTORCH_CONNECTOMICS_REVISION = "0d6ae57d5bb011f6b82b13c96fac9bb830ef7aac"
 PYTORCH_CONNECTOMICS_SOURCE = (
     "https://github.com/PytorchConnectomics/pytorch_connectomics"
 )
-TRAINING_RESOLUTION_XYZ_NM = (32.0, 32.0, 40.0)
+TRAINING_RESOLUTION_XYZ_NM = (64.0, 64.0, 40.0)
 _S3_BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _CHECKPOINT_SUFFIXES = (".ckpt", ".pth", ".pt")
 
@@ -70,6 +71,14 @@ class BossDBChannel:
     experiment: str
     channel: str
     cloudpath: str
+
+
+@dataclass(frozen=True)
+class PrecomputedScale:
+    mip: int
+    resolution_xyz: tuple[float, float, float]
+    minimum_xyz: tuple[int, int, int]
+    maximum_xyz: tuple[int, int, int]
 
 
 def _required_integer(config: Mapping[str, Any], name: str) -> int:
@@ -273,6 +282,152 @@ def validate_volume_bounds(
                 f"bounds [{bound_start}, {bound_stop})"
             )
     return minimum, maximum
+
+
+def _bounds_contain(
+    starts: Sequence[int],
+    stops: Sequence[int],
+    minimum: Sequence[int],
+    maximum: Sequence[int],
+) -> bool:
+    return all(
+        start >= bound_start and stop <= bound_stop
+        for start, stop, bound_start, bound_stop in zip(starts, stops, minimum, maximum)
+    )
+
+
+def _positive_resolution(values: Any) -> tuple[float, float, float]:
+    try:
+        resolution = tuple(float(value) for value in values)
+    except (TypeError, ValueError) as error:
+        raise ValueError("precomputed scale has an invalid resolution") from error
+    if len(resolution) < 3 or any(
+        not math.isfinite(value) or value <= 0 for value in resolution[:3]
+    ):
+        raise ValueError("precomputed scale has an invalid resolution")
+    return resolution[:3]
+
+
+def inspect_precomputed_scales(volume: Any) -> list[PrecomputedScale]:
+    """Read mip resolutions and global bounds from CloudVolume metadata."""
+    scales = getattr(volume, "scales", None)
+    if not isinstance(scales, Sequence) or isinstance(scales, (str, bytes)):
+        raise ValueError("CloudVolume did not provide precomputed scale metadata")
+
+    inspected = []
+    for mip, scale in enumerate(scales):
+        if not isinstance(scale, Mapping):
+            raise ValueError(f"precomputed mip {mip} metadata is invalid")
+        try:
+            minimum = _point_tuple(scale["voxel_offset"])
+            size = _point_tuple(scale["size"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError(
+                f"precomputed mip {mip} does not provide valid bounds"
+            ) from error
+        if any(value <= 0 for value in size):
+            raise ValueError(f"precomputed mip {mip} has a non-positive size")
+        inspected.append(
+            PrecomputedScale(
+                mip=mip,
+                resolution_xyz=_positive_resolution(scale.get("resolution")),
+                minimum_xyz=minimum,
+                maximum_xyz=tuple(
+                    offset + length for offset, length in zip(minimum, size)
+                ),
+            )
+        )
+    if not inspected:
+        raise ValueError("CloudVolume did not provide any precomputed scales")
+    return inspected
+
+
+def _resolutions_match(left: Sequence[float], right: Sequence[float]) -> bool:
+    return (
+        len(left) >= 3
+        and len(right) >= 3
+        and all(
+            math.isclose(float(a), float(b), rel_tol=1e-6, abs_tol=1e-6)
+            for a, b in zip(left[:3], right[:3])
+        )
+    )
+
+
+def _format_resolution(resolution: Sequence[float]) -> str:
+    return "x".join(f"{value:g}" for value in resolution[:3])
+
+
+def _describe_scale(scale: PrecomputedScale) -> str:
+    return (
+        f"mip {scale.mip} ({_format_resolution(scale.resolution_xyz)} nm, bounds "
+        f"{scale.minimum_xyz} to {scale.maximum_xyz})"
+    )
+
+
+def select_source_volume(
+    cloudpath: str,
+    config: InferenceConfig,
+    volume_factory: Callable[[str, int], Any],
+) -> tuple[
+    Any,
+    int,
+    tuple[int, int, int],
+    tuple[int, int, int],
+    tuple[float, float, float],
+]:
+    """Open the requested mip, correcting a uniquely identifiable mip mismatch."""
+    volume = volume_factory(cloudpath, config.resolution)
+    try:
+        minimum, maximum = validate_volume_bounds(volume, config)
+    except ValueError as bounds_error:
+        try:
+            scales = inspect_precomputed_scales(volume)
+        except ValueError as metadata_error:
+            raise ValueError(f"{bounds_error}; {metadata_error}") from bounds_error
+
+        compatible = [
+            scale
+            for scale in scales
+            if _bounds_contain(
+                config.starts,
+                config.stops,
+                scale.minimum_xyz,
+                scale.maximum_xyz,
+            )
+        ]
+        training_matches = [
+            scale
+            for scale in compatible
+            if _resolutions_match(scale.resolution_xyz, TRAINING_RESOLUTION_XYZ_NM)
+        ]
+        if len(training_matches) != 1:
+            if compatible:
+                options = "; ".join(_describe_scale(scale) for scale in compatible)
+                detail = f"bounds-compatible choices are: {options}"
+            else:
+                detail = "no available mip contains all requested bounds"
+            raise ValueError(f"{bounds_error}; {detail}") from bounds_error
+
+        selected = training_matches[0]
+        if selected.mip == config.resolution:
+            raise ValueError(str(bounds_error)) from bounds_error
+        replacement = volume_factory(cloudpath, selected.mip)
+        minimum, maximum = validate_volume_bounds(replacement, config)
+        resolution = _volume_resolution(replacement)
+        if not _resolutions_match(resolution, selected.resolution_xyz):
+            raise ValueError(
+                f"mip {selected.mip} resolution changed while opening the volume"
+            )
+        print(
+            f"WARNING: requested mip {config.resolution} does not contain the "
+            f"bounds; using mip {selected.mip} at "
+            f"{_format_resolution(resolution)} nm, the unique "
+            "bounds-compatible mip at the model training resolution",
+            flush=True,
+        )
+        return replacement, selected.mip, minimum, maximum, resolution
+
+    return volume, config.resolution, minimum, maximum, _volume_resolution(volume)
 
 
 def download_cutout_zyx(volume: Any, config: InferenceConfig):
@@ -639,14 +794,16 @@ def run(
     started = time.monotonic()
     print(f"Resolving {config.channel}", flush=True)
     channel = resolve_channel(config.channel, json_fetcher=json_fetcher)
-    volume = (volume_factory or open_precomputed_volume)(
-        channel.cloudpath, config.resolution
+    volume, source_mip, volume_minimum, volume_maximum, resolution_xyz = (
+        select_source_volume(
+            channel.cloudpath,
+            config,
+            volume_factory or open_precomputed_volume,
+        )
     )
-    volume_minimum, volume_maximum = validate_volume_bounds(volume, config)
-    resolution_xyz = _volume_resolution(volume)
     print(
         f"Downloading XYZ cutout {config.starts} to {config.stops} at mip "
-        f"{config.resolution} ({resolution_xyz} nm)",
+        f"{source_mip} ({_format_resolution(resolution_xyz)} nm)",
         flush=True,
     )
     if not np.allclose(resolution_xyz, TRAINING_RESOLUTION_XYZ_NM):
@@ -696,7 +853,9 @@ def run(
     report = {
         "source": channel.uri,
         "source_precomputed_cloudpath": channel.cloudpath,
-        "source_mip": config.resolution,
+        "requested_source_mip": config.resolution,
+        "source_mip": source_mip,
+        "source_mip_was_corrected": source_mip != config.resolution,
         "source_volume_bounds_xyz": [list(volume_minimum), list(volume_maximum)],
         "requested_bounds_xyz": [list(config.starts), list(config.stops)],
         "shape_xyz": list(config.shape_xyz),
@@ -755,7 +914,7 @@ def run(
                         "msg": (
                             "Detected nuclei in "
                             f"{list(config.shape_xyz)} voxels at mip "
-                            f"{config.resolution}; "
+                            f"{source_mip}; "
                             f"{foreground_voxels} foreground voxels"
                         ),
                     }

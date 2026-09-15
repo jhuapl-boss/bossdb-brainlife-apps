@@ -2,7 +2,7 @@
 
 Brainlife inference app that reads a public BossDB image cutout, applies a pretrained 3-D U-Net, and writes the thresholded prediction as a local [Neuroglancer precomputed](https://github.com/google/neuroglancer/blob/master/src/neuroglancer/datasource/precomputed/volume.md) segmentation layer.
 
-The registered test app is [BossDB Nuclei Detection](https://connects.brainlife.io/apps/6aa8266284691735460ab5f9).
+The registered test app is [BossDB Nuclei Detection](https://connects.brainlife.io/apps/6aa9705a16d2ef0408f5981a).
 
 The model performs **binary semantic segmentation**. Output value `0` means background and `1` means nucleus. It does not assign a distinct ID to each nucleus; connected components or watershed post-processing can be added later if instance labels are needed.
 
@@ -24,7 +24,7 @@ It follows `nuclei_3dunet_trial1_inference.yaml` from the nuclei-detector projec
 
 The app's `pytorch_connectomics` submodule pins PyTorch Connectomics to commit `0d6ae57d5bb011f6b82b13c96fac9bb830ef7aac`, matching the revision in the nuclei-detector repository. Docker installs that checkout directly. This is the `pytorch-connectomics` distribution from the repository above, not the unrelated `connectomics` package on PyPI.
 
-The training data had XYZ voxel size `32 × 32 × 40 nm`. Inference does not resample the source. Select the BossDB mip with that voxel size when possible; other physical resolutions are accepted but are out of the training distribution. The source and training resolutions are both recorded in `inference.json`.
+The archived Minnie65 training arrays record an XYZ voxel size of `64 × 64 × 40 nm`. (The inference YAML's `32 × 32 × 40 nm` entry is stale.) Inference does not resample the source. Select the BossDB mip with the archived training voxel size when possible; other physical resolutions are accepted but are out of the training distribution. The source and training resolutions are both recorded in `inference.json`.
 
 The container build lists the public artifacts below and downloads only the resolved `config.yaml` and best validation checkpoint:
 
@@ -51,14 +51,14 @@ Bounds are half-open selected-mip voxel coordinates: start is inclusive and stop
 - `channel`: BossDB reference supplied by the `neuro/bossdb` input.
 - `x_start`, `y_start`, `z_start`: inclusive global start coordinate.
 - `x_stop`, `y_stop`, `z_stop`: exclusive global stop coordinate.
-- `resolution`: zero-based source precomputed mip (`0` is the base mip).
+- `resolution`: zero-based source precomputed mip (`0` is the base mip). If the requested bounds do not fit that mip, the app inspects the channel's scales and corrects the selection only when exactly one bounds-compatible mip has the model's `64 × 64 × 40 nm` training resolution. Valid mip selections are never changed.
 - `model`: baked pretrained-model dropdown.
 - `threshold`: inclusive probability threshold from `0` through `1`.
 - `output_path`: relative local precomputed directory, default `outputs`.
 
 On Brainlife, leave `output_path` set to `outputs`, because that is the registered output subdirectory captured by the platform. A different relative path is useful for direct local execution but will not be collected by the current Brainlife output declaration.
 
-The output directory must be empty. Its precomputed `info` contains one `uint32`, compressed-segmentation mip whose global voxel offset equals the requested start and whose resolution equals the selected source mip. `outputs/inference.json` records bounds, preprocessing, exact checkpoint SHA-256, inference settings, device, threshold, and foreground statistics. `product.json` contains Brainlife's task success message.
+The output directory must be empty. Its precomputed `info` contains one `uint32`, compressed-segmentation mip whose global voxel offset equals the requested start and whose resolution equals the selected source mip. `outputs/inference.json` records the requested and actual source mips, whether correction was needed, bounds, preprocessing, exact checkpoint SHA-256, inference settings, device, threshold, and foreground statistics. `product.json` contains Brainlife's task success message.
 
 ## Runtime and resource use
 
