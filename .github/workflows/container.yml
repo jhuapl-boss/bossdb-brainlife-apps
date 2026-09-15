@@ -1,8 +1,7 @@
-name: Test and publish BossDB TIFF container
+name: Test and publish BossDB nuclei container
 
 on:
   push:
-    branches: [apex-hackathon-2026]
   workflow_dispatch:
 
 permissions:
@@ -14,13 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Build and test
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v4
+      - name: Build image with baked model
         env:
           IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
         run: |
-          docker build --platform linux/amd64 --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" -t "$IMAGE" .
-          docker run --rm --entrypoint python -e PYTHONPATH=/opt/bossdb-tiff \
-            -v "$PWD/tests:/tests:ro" "$IMAGE" -m unittest discover -s /tests -v
+          docker buildx build --platform linux/amd64 --load \
+            --cache-from type=gha --cache-to type=gha,mode=max \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            -t "$IMAGE" .
+      - name: Run unit tests
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+        run: |
+          docker run --rm --entrypoint python -e PYTHONPATH=/opt/bossdb-nuclei \
+            -v "$PWD/tests:/tests:ro" "$IMAGE" \
+            -m unittest discover -s /tests -v
       - name: Publish this commit's image
         env:
           IMAGE: ghcr.io/${{ github.repository }}:sha-${{ github.sha }}

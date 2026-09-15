@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-image="${BOSSDB_TIFF_IMAGE:-docker://ghcr.io/jhuapl-boss/bossdb-brainlife-apps:sha-$(git rev-parse HEAD)}"
+image="${BOSSDB_NUCLEI_IMAGE:-docker://ghcr.io/jhuapl-boss/bossdb-brainlife-apps:sha-$(git rev-parse HEAD)}"
 
 if command -v apptainer >/dev/null 2>&1; then
     runtime=apptainer
@@ -9,5 +9,5 @@ else
     runtime=singularity
 fi
 
-exec "$runtime" exec --bind "$PWD:/work" --pwd /work "$image" \
-    python /opt/bossdb-tiff/export_tiff.py
+exec "$runtime" exec --nv --bind "$PWD:/work" --pwd /work "$image" \
+    python /opt/bossdb-nuclei/nuclei_inference.py

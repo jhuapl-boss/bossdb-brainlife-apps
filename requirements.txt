@@ -1,2 +1,6 @@
 cloud-volume==12.14.4
-tifffile==2026.9.9
+monai==1.6.0
+numpy==2.4.6
+omegaconf==2.3.0
+./pytorch_connectomics
+torch==2.13.0

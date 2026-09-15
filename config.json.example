@@ -1,11 +1,13 @@
 {
-  "channel": "bossdb://mulcahy2022/15h_L1/em",
-  "x_start": 0,
-  "y_start": 0,
-  "z_start": 0,
-  "x_stop": 256,
-  "y_stop": 256,
-  "z_stop": 4,
+  "channel": "bossdb://chandok2026/human_boutons/8_nm_volume_upsampled",
+  "x_start": 28672,
+  "y_start": 28672,
+  "z_start": 30,
+  "x_stop": 29672,
+  "y_stop": 29672,
+  "z_stop": 40,
   "resolution": 0,
-  "export_as_volume": false
+  "model": "20260825_191045 - MONAI BasicUNet 3D",
+  "threshold": 0.5,
+  "output_path": "outputs"
 }

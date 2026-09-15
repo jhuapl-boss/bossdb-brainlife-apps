@@ -1,21 +1,21 @@
 {
-  "name": "BossDB TIFF Export",
-  "desc": "Export a public BossDB precomputed cutout as a 3D TIFF or TIFF slices.",
+  "name": "BossDB Nuclei Detection",
+  "desc": "Run pretrained 3-D U-Net nuclei inference on a public BossDB cutout and write a local precomputed segmentation layer.",
   "github": "jhuapl-boss/bossdb-brainlife-apps",
-  "github_branch": "apex-hackathon-2026",
+  "github_branch": "apex-hackathon-2026-segmentation",
   "inputs": [
     {
       "id": "input",
       "datatype": "6aa1c3da87d45c3b2da10ea6",
-      "desc": "Public BossDB channel reference"
+      "desc": "Public BossDB image channel reference"
     }
   ],
   "outputs": [
     {
       "id": "outputs",
       "datatype": "59c3eae633fc1cf9ead71679",
-      "datatype_tags": ["tiff"],
-      "desc": "TIFF export and metadata"
+      "datatype_tags": ["precomputed", "segmentation"],
+      "desc": "Binary nuclei segmentation in Neuroglancer precomputed format"
     }
   ],
   "config": {
@@ -63,10 +63,23 @@
       "min": 0,
       "desc": "Precomputed mip level; 0 is base resolution"
     },
-    "export_as_volume": {
-      "type": "boolean",
-      "default": false,
-      "desc": "Write one 3D TIFF instead of individual Z slices"
+    "model": {
+      "type": "enum",
+      "enum": ["20260825_191045 - MONAI BasicUNet 3D"],
+      "default": "20260825_191045 - MONAI BasicUNet 3D",
+      "desc": "Baked pretrained checkpoint"
+    },
+    "threshold": {
+      "type": "number",
+      "default": 0.5,
+      "min": 0,
+      "max": 1,
+      "desc": "Nucleus probability threshold"
+    },
+    "output_path": {
+      "type": "string",
+      "default": "outputs",
+      "desc": "Relative local directory for the precomputed layer"
     }
   },
   "projects": []
