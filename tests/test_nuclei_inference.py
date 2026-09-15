@@ -388,6 +388,7 @@ class OutputTests(unittest.TestCase):
         self.assertEqual(report["requested_source_mip"], 0)
         self.assertEqual(report["source_mip"], 0)
         self.assertFalse(report["source_mip_was_corrected"])
+        self.assertEqual(report["model"]["sliding_window_batch_size"], 2)
         self.assertEqual(report["output"]["foreground_voxels"], 12)
         self.assertEqual(product["brainlife"][0]["type"], "success")
 

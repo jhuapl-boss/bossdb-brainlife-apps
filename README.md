@@ -17,7 +17,7 @@ The sole model selector is:
 It follows `nuclei_3dunet_trial1_inference.yaml` from the nuclei-detector project. The app uses [PyTorch Connectomics](https://github.com/PytorchConnectomics/pytorch_connectomics) for both model construction and inference rather than maintaining a separate implementation:
 
 - The Connectomics `monai_basic_unet3d` factory builds the MONAI BasicUNet with feature widths `(32, 64, 128, 256, 512, 512)`, batch normalization, ReLU, and deconvolution upsampling.
-- The Connectomics eager inference engine runs `32 × 128 × 128` ZYX windows, 50% overlap, batches of four windows, and Wu bump blending.
+- The Connectomics eager inference engine runs `32 × 128 × 128` ZYX windows, 50% overlap, batches of two windows, and Wu bump blending.
 - Connectomics patch-first TTA computes a mean ensemble over all eight combinations of Z, Y, and X flips.
 - Sigmoid probabilities with a configurable threshold, default `0.5`.
 - Per-cutout `0–1` min-max normalization, matching PyTorch Connectomics' effective test-time transform. (The prepared HDF5 was first z-scored, but the configured framework transform subsequently min-maxed it; that composition is equivalent to min-maxing the raw cutout.)
@@ -64,7 +64,7 @@ The output directory must be empty. Its precomputed `info` contains one `uint32`
 
 Production execution is intended for one NVIDIA GPU. The `main` launcher enables Apptainer/Singularity NVIDIA passthrough. Inference falls back to CPU for development, but eight-pass 3-D U-Net inference will be slow.
 
-Only four model windows are placed on the GPU at once. PyTorch Connectomics keeps the downloaded image and full-volume accumulators in CPU memory and runs TTA inside each window batch. Budget at least 20 bytes per requested voxel, plus padding to one model window, per-view accumulators, the final mask, CloudVolume buffers, and Python overhead. Start with a modest cutout before scheduling large regions.
+Only two model windows are placed on the GPU at once. PyTorch Connectomics keeps the downloaded image and full-volume accumulators in CPU memory and runs TTA inside each window batch. Budget at least 20 bytes per requested voxel, plus padding to one model window, per-view accumulators, the final mask, CloudVolume buffers, and Python overhead. Start with a modest cutout before scheduling large regions.
 
 ## Development
 
