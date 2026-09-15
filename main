@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Set this to the published, versioned image in each generated app repository.
-image="${REFERENCE_INSPECT_IMAGE:-docker://ghcr.io/tjgrafft/app-nwb-reference-inspect:sha-$(git rev-parse HEAD)}"
+image="${CONTACTOME_IMAGE:-docker://ghcr.io/jhuapl-boss/bossdb-brainlife-apps:sha-$(git rev-parse HEAD)}"
 if command -v apptainer >/dev/null 2>&1; then
     runtime=apptainer
 else
@@ -9,4 +9,4 @@ else
 fi
 # Preserve the resource credential chain; never serialize credentials into config.json.
 exec "$runtime" exec --bind "$PWD:/work" --pwd /work "$image" \
-    python /opt/reference-inspect/inspect_reference.py
+    ./run_local_contactome.sh
