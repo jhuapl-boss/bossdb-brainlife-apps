@@ -13,13 +13,10 @@
 #
 # Example (small public Pinky100 trial):
 #   cp config.json.example config.json
-#   # Set input, mip, and enqueue_limit in config.json, then:
+#   # Set mip and enqueue_limit in config.json, then:
 #   AWS_PROFILE=bossdb ./run_local_contactome.sh
 #
 # config.json fields:
-#   input             Required public BossDB URI in the form
-#                     bossdb://collection/experiment/channel. It is resolved to
-#                     the backing precomputed CloudVolume URI before processing.
 #   output_directory  Output directory; default: contactome-output/<graph_id>.
 #   graph_id          Run label; default is a UTC timestamp.
 #   mip               MIP index or xyz resolution; default: 72,72,84.

@@ -52,8 +52,8 @@ def read_config(config_path, default_graph_id):
         fail("configuration must be a JSON object")
 
     if "segmentation_uri" in config:
-        fail("segmentation_uri is no longer supported; use input instead")
-    input_uri = string(config, "input", required=True)
+        fail("segmentation_uri is no longer supported; use input in brainlife instead")
+    input_uri = string(config, "channel", required=True)
     segmentation_channel = resolve_channel(input_uri).cloudpath
     graph_id = string(config, "graph_id", default_graph_id)
     output_directory = string(config, "output_directory", f"contactome-output/{graph_id}")
